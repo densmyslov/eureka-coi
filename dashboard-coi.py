@@ -93,6 +93,8 @@ if authenticated:
 
     with auth_col:
         st.markdown("<h2 style='text-align: center'>Create Client</h2>", unsafe_allow_html=True)
+        
+
         with st.expander("Fill out new client form"):
         
                 with st.form("create_new_client_form", clear_on_submit=True):
@@ -162,7 +164,9 @@ if authenticated:
         st.markdown("</div>", unsafe_allow_html=True)
 
     # Client df
-    with st.expander("See Your Clients"):
+    st.header("👥 Your Clients")
+
+    with st.expander("Expand to see Your Clients"):
         if client_df.empty:
             st.warning("You did not create any clients yet.")
         else:
@@ -173,17 +177,20 @@ if authenticated:
 #=====================================================================================================
                                         # DOCUMENTS
 #=====================================================================================================
-    # Credit Submission
-    st.header("📝 Client Documents")
-    
+
+
 #----------------------------------------SUBMIT DOCUMENTS--------------------------------------------
-    with st.expander("Submit Client Documents"):
+    st.header("📝 Client Documents")
+
+    with st.expander("Expand to Submit Client Documents"):
         st.markdown("Select client from the table below:")
+        st.info("Select a client in Your Clients section. Upload each required document individually. Supported formats: PDF, JPG, PNG.")
+
 
         col_submit, col_view = st.columns(2)
         with col_submit:
-
-            if email_hash :
+            if email_hash:
+                # Fetch docs_df for the selected client
                 url = 'https://kbeopzaocc.execute-api.us-east-1.amazonaws.com/prod/submit-docs'
                 payload = {
                     "message": "return docs_df",
@@ -192,194 +199,106 @@ if authenticated:
                 }
                 response = utils.safe_api_post(url, payload)
                 if response.status_code == 200:
-
                     response_data = response.json()
-                    if 'message' in response_data and response_data['message'] == 'docs_df does not exist':
-                        
-                    
+                    if response_data.get("message") == "docs_df does not exist":
                         docs_df = pd.DataFrame()
-                        st.session_state["docs_df"] = docs_df
                     else:
-                
-
-                        # 2. Get the 'body' field, which contains a JSON *string*
-                        body_string = response_data.get('body')
-                        docs_df_parquet_base64 = response_data.get('docs_df_parquet_base64')
+                        docs_df_parquet_base64 = response_data.get("docs_df_parquet_base64")
                         docs_df = utils.load_df_from_base64_parquet(docs_df_parquet_base64)
-                        st.session_state["docs_df"] = docs_df
+                    st.session_state["docs_df"] = docs_df
 
-
-
+                # Document upload UI
                 st.header("📂 Upload Required Documents")
                 st.markdown(
-                                f"<span style='color:green;'>You will upload documents of <span style='color:red;'>{first_name}</span> <span style='color:red;'>{last_name}</span> with email <span style='color:blue;'>{email}</span></span>",
-                                unsafe_allow_html=True
-                            )
-                
-                
-                # Let the user choose which document type to upload.
-                doc_types = ["EIN Letter", 
-                            "Articles of Incorporation", 
-                            "ID - front",
-                            "ID - back",
-                            "Questionnaire"]
-                
+                    f"<span style='color:green;'>You will upload documents of "
+                    f"<span style='color:red;'>{first_name} {last_name}</span> "
+                    f"with email <span style='color:blue;'>{email}</span></span>",
+                    unsafe_allow_html=True
+                )
+
+
+                doc_types = ["EIN Letter", "Articles of Incorporation", "ID - front", "ID - back", "Questionnaire"]
                 doc_type = st.selectbox("Select Document Type", doc_types)
-                # Provide a file uploader for the selected document type.
-                file_obj = st.file_uploader(f"Upload {doc_type}", type=["pdf", "jpg", "png"])
+
+                file_obj = st.file_uploader(f"Upload {doc_type}", type=["pdf", "jpg", "png"], key="file_upload")
+
                 if file_obj is not None:
-                    # Read and encode the file content to Base64.
-                    encoded_file = base64.b64encode(file_obj.read()).decode("utf-8")
-                    
-                    # Prepare payload with document type and file details.
+                    st.session_state["last_uploaded_file"] = {
+                        "doc_type": doc_type,
+                        "file_name": file_obj.name,
+                        "file_data": base64.b64encode(file_obj.read()).decode("utf-8")
+                    }
+
+                if st.button("Submit Document"):
+                    uploaded = st.session_state.get("last_uploaded_file")
+                    if uploaded is None:
+                        st.error("No document selected.")
+                        st.stop()
+
                     payload = {
-                                "doc_type": doc_type,
-                                "file_name": file_obj.name,
-                                "file_data": encoded_file,
-                                "client_email_hash": email_hash,
-                                "coi_email_hash": st.session_state["coi_email_hash"],
-                                "coi_uid": st.session_state["coi_uid"]
-                            }
-        
-                    # Send the payload to the API.
+                        "doc_type": uploaded["doc_type"],
+                        "file_name": uploaded["file_name"],
+                        "file_data": uploaded["file_data"],
+                        "client_email_hash": email_hash,
+                        "coi_email_hash": st.session_state["coi_email_hash"],
+                        "coi_uid": st.session_state["coi_uid"]
+                    }
 
-                    if st.button("Submit Document"):
-                        
-                        url = 'https://kbeopzaocc.execute-api.us-east-1.amazonaws.com/prod/submit-docs'
-                        response = utils.safe_api_post(url, payload)
+                    url = 'https://kbeopzaocc.execute-api.us-east-1.amazonaws.com/prod/submit-docs'
+                    response = utils.safe_api_post(url, payload)
 
-                        if response is not None and response.status_code == 200:
-                            st.success("Document submitted successfully!")
-                            try:
-                                # 1. Parse the main JSON response from API Gateway/Lambda A
-                                response_data = response.json()
+                    if response is not None and response.status_code == 200:
+                        st.success("Document submitted successfully!")
+                        try:
+                            response_data = response.json()
+                            docs_df_parquet_base64 = response_data.get("docs_df_parquet_base64")
+                            st.session_state["docs_df"] = utils.load_df_from_base64_parquet(docs_df_parquet_base64)
+                            st.session_state["show_images"] = True
+                            st.session_state.pop("last_uploaded_file", None)  # Clear the file after successful upload
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Failed to process response: {e}")
+                    else:
+                        st.error(f"API call failed with status code: {response.status_code if response else 'No response'}")
 
-                                # 2. Get the 'body' field, which contains a JSON *string*
-                                body_string = response_data.get('body')
-                                docs_df_parquet_base64 = response_data.get('docs_df_parquet_base64')
-                                st.session_state.docs_df = utils.load_df_from_base64_parquet(docs_df_parquet_base64)
-                                
-
-                                
-
-                            except json.JSONDecodeError as e:
-                                st.error(f"Failed to decode JSON response from API: {e}")
-                                st.text(f"Raw response text: {response.text}")
-                            except KeyError as e:
-                                st.error(f"Missing expected key in API response: {e}")
-                                st.json(response.json()) # Show the structure received
-                            except Exception as e:
-                                st.error(f"An error occurred processing the response: {e}")
-
-                        elif response is not None:
-                            st.error(f"API call failed with status code {response.status_code}")
-                            try:
-                                st.json(response.json()) # Show error details if available
-                            except json.JSONDecodeError:
-                                st.text(f"Raw error response: {response.text}")
-                        else:
-                            st.error("API call failed (no response received).")
                         
 #----------------------------------------VIEW SUBMITTED DOCUMENTS--------------------------------------------
-    with st.expander("View Submitted Documents"):
+    with st.expander("Expand to View Submitted Documents"):
     
             if st.session_state.get("docs_df").empty:
                 st.warning("You did not submit any documents yet.")
             else:
-                st.cache_data()
-                def get_images_to_show(docs_df, email_hash, avail_doc_types, counter=None):
-                    images = {}
-                    doc_key_dict = docs_df.query("doc_type==@avail_doc_types").drop_duplicates(subset=["doc_type"])[['doc_type', 'key']].set_index("doc_type").to_dict()['key']
-
-                    for doc_type, key in doc_key_dict.items():
-
-                        payload = {"key": key}
-                        url = "https://kbeopzaocc.execute-api.us-east-1.amazonaws.com/prod/get-image"
-                        response =  utils.safe_api_post(url, payload)
-
-                        if response.status_code == 200:
-                            data = response.json()
-                            base64_image = data.get("image")
-                            # decode and open as PIL
-                            image_bytes = base64.b64decode(base64_image)
-                            images[doc_type] =  Image.open(BytesIO(image_bytes))
-                    return images
-                
 
 
-                            
-                
-
-                
+             
                 doc_types_uploaded = st.session_state["docs_df"].dropna(subset=["doc_type"])["doc_type"].unique()
                 doc_types_list = [True if i in doc_types_uploaded else False for i in doc_types]
                 docs_uploaded_df = pd.DataFrame({"doc_type": doc_types, "available": doc_types_list})
                 st.dataframe(docs_uploaded_df)
 
                 avail_doc_types = docs_uploaded_df.query("available==True").doc_type.tolist()
-                images = get_images_to_show(docs_df, email_hash, avail_doc_types, counter=None)
 
-        
+                if (
+                        "docs_df" in st.session_state
+                        and not st.session_state["docs_df"].empty
+                        and {"doc_type", "key"}.issubset(st.session_state["docs_df"].columns)
+                    ):
+                    docs_df = st.session_state["docs_df"]
 
-                def display_images_in_tabs(image_dict):
-                    """
-                    Display images from a dictionary where keys are tab names and values are PIL images.
-                    """
-                    tab_labels = list(image_dict.keys())
-                    tabs = st.tabs(tab_labels)
+                    # Show the uploaded document status
+                    doc_types_uploaded = docs_df["doc_type"].dropna().unique()
+                    doc_types_list = [doc_type in doc_types_uploaded for doc_type in doc_types]
+                    docs_uploaded_df = pd.DataFrame({"doc_type": doc_types, "available": doc_types_list})
 
-                    for tab, key in zip(tabs, tab_labels):
-                        with tab:
-                            st.image(image_dict[key], caption=key, width = 400)
-                display_images_in_tabs(images)
+                    # st.dataframe(docs_uploaded_df)
 
-            
+                    avail_doc_types = docs_uploaded_df.query("available == True")["doc_type"].tolist()
 
-
-
-
-            # # Create a DataFrame copy and insert the selection column with current state.
-            # df_with_select = docs_uploaded_df.copy()
-            # df_with_select.insert(0, "Select", docs_uploaded_df["available"])
-            
-            # # Display the data editor.
-            # edited_df = st.data_editor(
-            #     df_with_select,
-            #     hide_index=True,
-            #     column_config={"Select": st.column_config.CheckboxColumn(required=False)},
-            #     disabled=docs_uploaded_df.columns.tolist(),
-            #     use_container_width=True,
-            # )
+                    # Show images
+                    images = utils.get_images_to_show(docs_df, email_hash, avail_doc_types)
+                    utils.display_images_in_tabs(images)
 
             
-            # selected_doc_types = edited_df[edited_df["Select"] == True]["doc_type"].tolist()
-            
-
-            # if st.button(":blue[Show selected files]"):
-            #     if len(selected_doc_types) == 0:
-            #         st.error("You have not selected any files")
-            #         st.stop()
-                
-            #     for doc_type in selected_doc_types:
-            #         # try:
-            #             images = []
-            #             df_to_show = st.session_state["docs_df"].copy()
-            #             df = df_to_show.query("doc_class=='images' & doc_type==@doc_type")
-            #             st.dataframe(df)
-            #             if not df.empty:
-            #                 image = get_images_to_show(df, num_images = 1)
-            #                 st.write(image)
-            #                 if image:
-            #                     images.append(image)
-            #                 st.write(len(images))
-
-
-            #                 # pil_images_to_show, byte_images_to_show = utils.get_images_to_show(gr)
-                            
-
-                    
-            #         # except:
-            #         #     st.warning("You did not submit any documents of this type yet.")
                 
                     
 

@@ -16,44 +16,44 @@ from PIL import Image
 import streamlit as st
 import utils  # assuming safe_api_post lives here
 
-@st.cache_data()
-def get_images_to_show(df):
+def display_images_in_tabs(image_dict):
     """
-    After user selects the invoices to show, this function gets each page image
-    via HTTP API (base64‑encoded) instead of directly from S3.
-    Returns two dicts mapping file_name → list of PIL images / raw bytes.
+    Display images from a dictionary where keys are tab names and values are PIL images.
     """
-    pil_images_to_show = {}
-    byte_images_to_show = {}
+    tab_labels = list(image_dict.keys())
+    tabs = st.tabs(tab_labels)
 
-    url = "https://kbeopzaocc.execute-api.us-east-1.amazonaws.com/prod/get-image"
+    for tab, key in zip(tabs, tab_labels):
+        with tab:
+            st.image(image_dict[key], caption=key, width = 400)
 
-    image_keys = df['key'].tolist()
+st.cache_data()
+def get_images_to_show(docs_df, email_hash, avail_doc_types, counter=None):
+    images = {}
 
-    pil_list = []
-    byte_list = []
+    if "doc_type" not in docs_df.columns or "key" not in docs_df.columns:
+        return images  # nothing to show yet
 
-    for key in image_keys:
+    filtered_df = docs_df[docs_df["doc_type"].isin(avail_doc_types)]
+    doc_key_dict = (
+        filtered_df.drop_duplicates(subset=["doc_type"])[["doc_type", "key"]]
+        .set_index("doc_type")
+        .to_dict()
+        .get("key", {})
+    )
+
+    for doc_type, key in doc_key_dict.items():
         payload = {"key": key}
+        url = "https://kbeopzaocc.execute-api.us-east-1.amazonaws.com/prod/get-image"
         response = utils.safe_api_post(url, payload)
 
         if response.status_code == 200:
             data = response.json()
             base64_image = data.get("image")
-            # decode and open as PIL
             image_bytes = base64.b64decode(base64_image)
-            image = Image.open(BytesIO(image_bytes))
+            images[doc_type] = Image.open(BytesIO(image_bytes))
 
-            pil_list.append(image)
-            byte_list.append(image_bytes)
-        # else:
-        #     # no more pages for this invoice
-        #     break
-
-        pil_images_to_show[key] = pil_list
-        byte_images_to_show[key] = byte_list
-
-    return pil_images_to_show, byte_images_to_show
+    return images
 
 
 def _load_docs():
@@ -192,3 +192,43 @@ def load_df_from_base64_parquet(base64_string: str) -> pd.DataFrame | None:
         # Catch potential errors during Parquet reading (e.g., corrupted data)
         st.error(f"Error reading Parquet data: {e}")
         return None
+
+@st.fragment
+def upload_document_fragment():
+    st.header("\U0001F4C2 Upload Required Documents")
+    st.markdown(f"<span style='color:green;'>You will upload documents for: <span style='color:red;'>{first_name} {last_name}</span> ({email})</span>", unsafe_allow_html=True)
+
+    doc_types = ["EIN Letter", "Articles of Incorporation", "ID - front", "ID - back", "Questionnaire"]
+    doc_type = st.selectbox("Select Document Type", doc_types)
+    file_obj = st.file_uploader(f"Upload {doc_type}", type=["pdf", "jpg", "png"], key="file_upload")
+
+    if file_obj:
+        st.session_state["last_uploaded_file"] = {
+            "doc_type": doc_type,
+            "file_name": file_obj.name,
+            "file_data": base64.b64encode(file_obj.read()).decode("utf-8")
+        }
+
+    if st.button("Submit Document"):
+        uploaded = st.session_state.get("last_uploaded_file")
+        if uploaded is None:
+            st.error("No document selected.")
+            return
+
+        payload = {
+            "doc_type": uploaded["doc_type"],
+            "file_name": uploaded["file_name"],
+            "file_data": uploaded["file_data"],
+            "client_email_hash": email_hash,
+            "coi_email_hash": st.session_state["coi_email_hash"],
+            "coi_uid": st.session_state["coi_uid"]
+        }
+
+        url = "https://kbeopzaocc.execute-api.us-east-1.amazonaws.com/prod/submit-docs"
+        response = utils.safe_api_post(url, payload)
+        if response and response.status_code == 200:
+            docs_df_parquet_base64 = response.json().get("docs_df_parquet_base64")
+            st.session_state["docs_df"] = utils.load_df_from_base64_parquet(docs_df_parquet_base64)
+            st.success("Document submitted successfully!")
+        else:
+            st.error("Failed to submit document.")
