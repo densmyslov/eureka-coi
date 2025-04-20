@@ -183,8 +183,8 @@ if authenticated:
     st.header("📝 Client Documents")
 
     with st.expander("Expand to Submit Client Documents"):
-        st.markdown("Select client from the table below:")
-        st.info("Select a client in Your Clients section. Upload each required document individually. Supported formats: PDF, JPG, PNG.")
+
+        st.info("Select a client in Your Clients section above. Upload each required document individually. Supported formats: PDF, JPG, PNG.")
 
 
         col_submit, col_view = st.columns(2)
