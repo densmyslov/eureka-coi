@@ -16,6 +16,19 @@ from PIL import Image
 import streamlit as st
 import utils  # assuming safe_api_post lives here
 
+def calculate_amount_to_pay():
+    tokens_to_buy = st.session_state.get("tokens_to_buy")
+    price_qty_data_df = st.session_state.get("price_qty_data_df")
+    if tokens_to_buy and price_qty_data_df is not None:
+        amount_to_pay =  price_qty_data_df.loc[price_qty_data_df["Qty"] == tokens_to_buy, "Price"].values[0]
+        formatted_amount = "${:,.2f}".format(amount_to_pay)
+        st.session_state['amount_to_pay'] = amount_to_pay
+        return formatted_amount
+
+    else:
+        return 0.0
+
+
 def display_images_in_tabs(image_dict):
     """
     Display images from a dictionary where keys are tab names and values are PIL images.

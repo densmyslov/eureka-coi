@@ -12,6 +12,7 @@ from time import sleep
 import gzip
 import json
 import utils
+import stripe_payment as stp
 
 st.set_page_config(page_title="Eureka Partners Client Dashboard", layout="wide")
 # Your dashboard code here
@@ -83,6 +84,7 @@ if authenticated:
     coi_email_hash = st.session_state.get("coi_email_hash")
 
 
+
     # Simulated values
     monthly_performance = [2, 5, 3, 7, 6, 9]
 
@@ -147,21 +149,20 @@ if authenticated:
         st.markdown(f"<h3 style='text-align: center'>{current_token_balance}</h3>", unsafe_allow_html=True)
 
     with price_col:
-        st.markdown("<h2 style='text-align: left'>Token Pricing</h2>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: left'>Buy Tokens</h2>", unsafe_allow_html=True)
         st.dataframe(price_qty_data_df)
         st.markdown("<div style='display: flex; justify-content: center;'>", unsafe_allow_html=True)
-        token_to_buy = st.radio(
+        tokens_to_buy = st.radio(
             "Buy tokens", price_qty_data_df['Qty'],
             horizontal=True,
             label_visibility="visible"
         )
-        st.markdown("</div>", unsafe_allow_html=True)
+        if tokens_to_buy:
+            st.session_state["tokens_to_buy"] = tokens_to_buy
+            amount_to_pay = utils.calculate_amount_to_pay()
+            st.metric(label="Amount to Pay", value=amount_to_pay)
 
-        # Center the button as well
-        st.markdown("<div style='display: flex; justify-content: center;'>", unsafe_allow_html=True)
-        if st.button("Buy with Stripe"):
-            st.info(f"Redirecting to Stripe for {token_to_buy} token(s)...")
-        st.markdown("</div>", unsafe_allow_html=True)
+            stp.pay_with_stripe()
 
     # Client df
     st.header("👥 Your Clients")
