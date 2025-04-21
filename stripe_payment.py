@@ -2,7 +2,7 @@ import os
 import streamlit as st
 import stripe
 
-STRIPE_API_KEY=st.secrets['STRIPE']['STRIPE_API_KEY']
+
 STRIPE_SECRET_KEY=st.secrets['STRIPE']['STRIPE_SECRET_KEY']
 stripe.api_key = STRIPE_SECRET_KEY
 
@@ -37,8 +37,12 @@ def pay_with_stripe():
             success_url=SUCCESS_URL + '?session_id={CHECKOUT_SESSION_ID}', # Include session ID for potential verification on success page
             cancel_url=CANCEL_URL,
             automatic_tax={'enabled': False}, # Enable automatic tax calculation
-            # customer_email= st.session_state['user_info']['email'], # Optional: Pre-fill customer email
-            # metadata={'order_id': '12345'}, # Optional: Add custom data to pass through
+            customer_email= st.session_state['coi_email'],
+            metadata={'order_id': '12345',
+                      'coi_email': st.session_state['coi_email'],
+                      'num_tokens': st.session_state['tokens_to_buy'],
+                      'amount_total' : st.session_state['amount_to_pay']
+                      }
         )
 
         # 4) Redirect user to Stripe Checkout URL

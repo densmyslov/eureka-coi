@@ -43,6 +43,7 @@ def login():
                     response = cogauth.sign_in_user(email, password)
                     if response["status"] == "AUTHENTICATED":
                         # ✅ Successful normal login
+                        st.session_state['coi_email'] = email
                         st.session_state.access_token = response["access_token"]
                         st.session_state.authenticated = True
                         st.success("Client found! You are logged in.")

@@ -66,6 +66,8 @@ if authenticated:
 
         st.rerun() # makes sure that app shows login form login.login()
 
+  
+    st.sidebar.success(f"You are logged in as {st.session_state['coi_email']}.")
 
 
         
