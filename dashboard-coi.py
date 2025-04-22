@@ -172,6 +172,10 @@ if authenticated:
     with st.expander("Expand to see Your Clients"):
         if client_df.empty:
             st.warning("You did not create any clients yet.")
+            email_hash = None
+            first_name = ""
+            last_name = ""
+            email = ""
         else:
             # st.dataframe(client_df)
             email_hash, first_name, last_name, email = utils.render_selector(client_df)

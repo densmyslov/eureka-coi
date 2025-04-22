@@ -57,9 +57,11 @@ def login():
                         st.session_state.need_new_password = True
                         st.session_state.cognito_session = response["session"]
                         st.session_state.cognito_email = email
+                        st.session_state['coi_email'] = email
                         st.warning("You must set a new password before continuing.")
                 except Exception as e:
                     st.error("Login failed. Please schedule an onboarding call below.")
+                    st.write(e)
 
 
     # If user needs to set a new password
@@ -82,13 +84,67 @@ def login():
                             st.session_state.cognito_session
                         )
                         st.session_state.jwt = response["AuthenticationResult"]["AccessToken"]
-                        st.session_state.authenticated = True
+                        st.session_state.authenticated = False
                         st.session_state.need_new_password = False
-                        st.success("Password reset successful! You are now logged in.")
+                        st.success("Password reset successful! You can now log in with your new password.")
                         st.rerun()
 
                     except Exception as e:
                         st.error(f"Failed to set new password: {str(e)}")
+    # Handle Forgot Password
+    if st.button("Forgot Password?"):
+        st.session_state.show_forgot_password = True
+
+    if st.session_state.get("show_forgot_password"):
+        st.title("Reset Your Password")
+        with st.form("forgot_form"):
+            forgot_email = st.text_input("Enter your email")
+            submit_forgot = st.form_submit_button("Send Reset Code")
+
+            if submit_forgot:
+                url = "https://kbeopzaocc.execute-api.us-east-1.amazonaws.com/prod/forgot-password"
+                payload = {"email": forgot_email}
+                try:
+                    response = utils.safe_api_post(url, payload)
+                    if response.status_code == 200:
+                        st.success("A verification code was sent to your email.")
+                        st.session_state.reset_email = forgot_email
+                        st.session_state.code_sent = True
+                    else:
+                        st.error(response.json().get("message", "Failed to send reset code."))
+                except Exception as e:
+                    st.error(f"Error: {str(e)}")
+
+    # Reset Password Form
+    if st.session_state.get("code_sent"):
+        st.title("Enter Verification Code and New Password")
+        with st.form("reset_password_form"):
+            reset_code = st.text_input("Verification Code")
+            new_password = st.text_input("New Password", type="password")
+            confirm_password = st.text_input("Confirm Password", type="password")
+            submit_reset = st.form_submit_button("Reset Password")
+
+            if submit_reset:
+                if new_password != confirm_password:
+                    st.error("Passwords do not match.")
+                else:
+                    url = "https://kbeopzaocc.execute-api.us-east-1.amazonaws.com/prod/reset-password"
+                    payload = {
+                        "email": st.session_state.reset_email,
+                        "code": reset_code,
+                        "new_password": new_password
+                    }
+                    try:
+                        response = utils.safe_api_post(url, payload)
+                        if response.status_code == 200:
+                            st.success("Password reset successful. You can now log in.")
+                            st.session_state.show_forgot_password = False
+                            st.session_state.code_sent = False
+                        else:
+                            st.error(response.json().get("message", "Password reset failed."))
+                    except Exception as e:
+                        st.error(f"Error: {str(e)}")
+
 
     return st.session_state.authenticated
 
