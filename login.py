@@ -8,6 +8,7 @@ import pandas as pd
 import base64
 from io import BytesIO
 import gzip
+from time import sleep
 
 
 AWS_ACCESS_KEY_ID = st.secrets["cognitoClient"]["AWS_ACCESS_KEY_ID"]
@@ -29,10 +30,13 @@ def login():
         st.session_state.authenticated = False
     if "need_new_password" not in st.session_state:
         st.session_state.need_new_password = False
+    if "login_failed" not in st.session_state:
+        st.session_state.login_failed = False
+
 
     if not st.session_state.authenticated and not st.session_state.need_new_password:
         st.title("Please Log In")
-        with st.form("login_form"):
+        with st.form("login_form", clear_on_submit=True):
             email = st.text_input("Email")
             password = st.text_input("Password", type="password")
             submit_button = st.form_submit_button("Log In")
@@ -50,6 +54,7 @@ def login():
                         decoded_access_token = jwt.get_unverified_claims(st.session_state["access_token"])
                         coi_uid = decoded_access_token["username"]
                         st.session_state["coi_uid"] = coi_uid
+                        st.session_state.login_failed = False 
                         get_coi_data()
                         st.rerun()
                     elif response["status"] == "NEW_PASSWORD_REQUIRED":
@@ -59,9 +64,12 @@ def login():
                         st.session_state.cognito_email = email
                         st.session_state['coi_email'] = email
                         st.warning("You must set a new password before continuing.")
+
                 except Exception as e:
-                    st.error("Login failed. Please schedule an onboarding call below.")
-                    st.write(e)
+                    st.error("Login failed")
+                    st.session_state.login_failed = True
+                    
+
 
 
     # If user needs to set a new password
@@ -91,9 +99,12 @@ def login():
 
                     except Exception as e:
                         st.error(f"Failed to set new password: {str(e)}")
-    # Handle Forgot Password
-    if st.button("Forgot Password?"):
-        st.session_state.show_forgot_password = True
+    #================================================== Handle Forgot Password =======================================
+    # Show "Forgot Password?" only if login failed
+    if st.session_state.login_failed:
+        if st.button("Forgot Password?"):
+            st.session_state.show_forgot_password = True
+
 
     if st.session_state.get("show_forgot_password"):
         st.title("Reset Your Password")
@@ -140,6 +151,8 @@ def login():
                             st.success("Password reset successful. You can now log in.")
                             st.session_state.show_forgot_password = False
                             st.session_state.code_sent = False
+                            sleep(3)
+                            st.rerun()
                         else:
                             st.error(response.json().get("message", "Password reset failed."))
                     except Exception as e:
