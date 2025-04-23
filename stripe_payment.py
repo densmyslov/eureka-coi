@@ -37,7 +37,6 @@ def pay_with_stripe():
             success_url=SUCCESS_URL + '?session_id={CHECKOUT_SESSION_ID}', # Include session ID for potential verification on success page
             cancel_url=CANCEL_URL,
             automatic_tax={'enabled': False}, # Enable automatic tax calculation
-            customer_email= st.session_state['coi_email'],
             metadata={'order_id': '12345',
                       'coi_email': st.session_state['coi_email'],
                       'num_tokens': st.session_state['tokens_to_buy'],
