@@ -95,6 +95,7 @@ if authenticated:
 #==========================================CREATE NEW CLIENT=======================================
     auth_col, balance_col, price_col = st.columns(3)
 
+
     with auth_col:
         st.markdown("<h2 style='text-align: center'>Create Client</h2>", unsafe_allow_html=True)
         

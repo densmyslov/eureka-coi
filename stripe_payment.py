@@ -36,11 +36,15 @@ def pay_with_stripe():
             mode='payment', # Use 'subscription' for recurring payments
             success_url=SUCCESS_URL + '?session_id={CHECKOUT_SESSION_ID}', # Include session ID for potential verification on success page
             cancel_url=CANCEL_URL,
-            automatic_tax={'enabled': False}, # Enable automatic tax calculation
+            automatic_tax={'enabled': False},
+
             metadata={'order_id': '12345',
+                      'coi_id': st.session_state['coi_uid'],
                       'coi_email': st.session_state['coi_email'],
+                      'email_hash': st.session_state['coi_email_hash'],
                       'num_tokens': st.session_state['tokens_to_buy'],
-                      'amount_total' : st.session_state['amount_to_pay']
+                      'amount_total' : st.session_state['amount_to_pay'],
+                      'transaction_type': 'Token purchase'
                       }
         )
 
