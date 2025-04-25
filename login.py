@@ -50,7 +50,7 @@ def login():
                         st.session_state['coi_email'] = email
                         st.session_state.access_token = response["access_token"]
                         st.session_state.authenticated = True
-                        st.success("Client found! You are logged in.")
+                        st.success("You are logged in.")
                         decoded_access_token = jwt.get_unverified_claims(st.session_state["access_token"])
                         coi_uid = decoded_access_token["username"]
                         st.session_state["coi_uid"] = coi_uid
@@ -161,7 +161,8 @@ def login():
 
     return st.session_state.authenticated
 
-def get_coi_data():
+st.cache_data()
+def get_coi_data(counter=None):
     url = 'https://kbeopzaocc.execute-api.us-east-1.amazonaws.com/prod/get-user-data'
     response = utils.safe_api_post(url, {})
     st.write(response)

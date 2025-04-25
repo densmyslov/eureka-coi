@@ -74,6 +74,23 @@ if authenticated:
     # ✅ Only show dashboard if authenticated
     st.success("Welcome to the Dashboard!")
 
+    #=======================================REFRESH APP============================
+    if "counter" not in st.session_state:
+        st.session_state.counter = 0
+
+    def increment_counter():
+        st.session_state.counter += 1
+
+    if st.sidebar.button("Refresh"):
+        increment_counter()
+        # af.load_coi_table.clear()
+        current_token_balance, price_qty_data_df, client_df, coi_email_hash = login.get_coi_data(counter=st.session_state['counter'])
+        st.session_state.current_token_balance = current_token_balance
+        st.session_state.price_qty_data_df = price_qty_data_df
+        st.session_state.client_df = client_df
+        st.session_state.coi_email_hash = coi_email_hash
+        st.rerun()
+
     # docs_df is df showing client documents in client's subfolder (client_email_hash)
     if "docs_df" not in st.session_state or st.session_state.docs_df is None:
         st.session_state.docs_df = pd.DataFrame()
@@ -130,6 +147,7 @@ if authenticated:
                                     "company_name": company_name,
                                     "coi_uid": st.session_state["coi_uid"],
                                     "coi_email_hash": st.session_state["coi_email_hash"],
+                                    "coi_email": st.session_state['coi_email'],
                                     "docs_submitted": "False"
                                 }
                                         
