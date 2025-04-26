@@ -60,11 +60,7 @@ if authenticated:
     # when btn Logout is clicked, all st.session keys are erased
     # since 'authorized' key is erased too, app returnes to unauthenticated state 
     if st.sidebar.button("Logout"):
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
-        
-
-        st.rerun() # makes sure that app shows login form login.login()
+        login.logout()
 
   
     st.sidebar.success(f"You are logged in as {st.session_state['coi_email']}.")

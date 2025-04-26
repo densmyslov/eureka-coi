@@ -92,13 +92,16 @@ def login():
                             st.session_state.cognito_session
                         )
                         st.session_state.jwt = response["AuthenticationResult"]["AccessToken"]
+                        st.success("Password reset successful! You can now log in with your new password.")
+                        sleep(3)
                         st.session_state.authenticated = False
                         st.session_state.need_new_password = False
-                        st.success("Password reset successful! You can now log in with your new password.")
                         st.rerun()
 
                     except Exception as e:
                         st.error(f"Failed to set new password: {str(e)}")
+                        logout()
+                        
     #================================================== Handle Forgot Password =======================================
     # Show "Forgot Password?" only if login failed
     if st.session_state.login_failed:
@@ -157,9 +160,17 @@ def login():
                             st.error(response.json().get("message", "Password reset failed."))
                     except Exception as e:
                         st.error(f"Error: {str(e)}")
+                        logout()
 
 
     return st.session_state.authenticated
+
+def logout():
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
+
+
+    st.rerun()
 
 st.cache_data()
 def get_coi_data(counter=None):
