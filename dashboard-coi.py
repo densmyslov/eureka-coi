@@ -93,7 +93,7 @@ if authenticated:
 
 #========================================GET COI DATA===========================================       
     # these values are stored by login.get_coi_data() which is part of login.login()
-    current_token_balance = st.session_state.get("current_token_balance")
+    current_token_balance = int(st.session_state.get("current_token_balance"))
     price_qty_data_df = st.session_state.get("price_qty_data_df")
     client_df = st.session_state.get("client_df")
     coi_email_hash = st.session_state.get("coi_email_hash")
@@ -105,15 +105,16 @@ if authenticated:
 
 
 
-#==========================================CREATE NEW CLIENT=======================================
+#=================================================================================
+# CREATE NEW CLIENT
+#=================================================================================
     auth_col, balance_col, price_col = st.columns(3)
 
 
     with auth_col:
         st.markdown("<h2 style='text-align: center'>Create Client</h2>", unsafe_allow_html=True)
-        
-
-        with st.expander("Fill out new client form"):
+        if current_token_balance > 0:
+            with st.expander("Fill out new client form"):
         
                 with st.form("create_new_client_form", clear_on_submit=True):
                     first_name = st.text_input("First Name")
@@ -159,12 +160,19 @@ if authenticated:
                             st.session_state["coi_email_hash"] = coi_email_hash
                             sleep(3)
                             st.rerun()
+        else:
+            st.warning("You need to buy more tokens to create new clients")
             
-
+#=================================================================================
+# SHOW TOKEN BALANCE
+#=================================================================================
     with balance_col:
         st.markdown("<h2 style='text-align: center'>Token Balance</h2>", unsafe_allow_html=True)
         st.markdown(f"<h3 style='text-align: center'>{current_token_balance}</h3>", unsafe_allow_html=True)
 
+#=================================================================================
+# BUY TOKENS
+#=================================================================================
     with price_col:
         st.markdown("<h2 style='text-align: left'>Buy Tokens</h2>", unsafe_allow_html=True)
         st.dataframe(price_qty_data_df)
