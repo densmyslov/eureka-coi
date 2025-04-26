@@ -112,7 +112,7 @@ if authenticated:
 
 
     with auth_col:
-        st.markdown("<h2 style='text-align: center'>Create Client</h2>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: center'>Add New Client</h2>", unsafe_allow_html=True)
         if current_token_balance > 0:
             with st.expander("Fill out new client form"):
         
@@ -151,7 +151,7 @@ if authenticated:
                         url = 'https://kbeopzaocc.execute-api.us-east-1.amazonaws.com/prod/create-new-client'
                         response = utils.safe_api_post(url, payload)
                         if response.status_code == 200:
-                            st.success("Client created successfully!")
+                            st.success("Client added successfully!")
                             # update COI data
                             current_token_balance, price_qty_data_df, client_df, coi_email_hash = login.get_coi_data()
                             st.session_state["current_token_balance"] = current_token_balance
@@ -161,7 +161,7 @@ if authenticated:
                             sleep(3)
                             st.rerun()
         else:
-            st.warning("You need to buy more tokens to create new clients")
+            st.warning("You need to buy tokens to add new clients")
             
 #=================================================================================
 # SHOW TOKEN BALANCE

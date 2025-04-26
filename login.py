@@ -179,7 +179,7 @@ def get_coi_data(counter=None):
     st.write(response)
     if response.status_code == 200:
         data = response.json()
-        st.write(data)
+        # st.write(data)
         access_on = data['access_on']['BOOL']
         st.write(f"Access on: {access_on}")
         if not access_on:
@@ -215,7 +215,11 @@ def get_coi_data(counter=None):
 
 
 
-    return current_token_balance, price_qty_data_df, client_df, coi_email_hash
+        return current_token_balance, price_qty_data_df, client_df, coi_email_hash
+    else:
+        st.warning("Please contact Eureka Partnersa Support at contact@eurekapartners.com")
+        logout()
+        return None, None, None, None
     
         
             
