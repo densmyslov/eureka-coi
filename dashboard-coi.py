@@ -37,7 +37,15 @@ st.markdown("""
             </style>
             """, unsafe_allow_html=True)
 
-#========================================AUTHENTICATION==========================================
+#====================================================================================================================
+# INITIALIZE SESSION STATES
+#====================================================================================================================
+if 'access_on' not in st.session_state:
+    st.session_state.access_on = 'False'
+
+#====================================================================================================================
+#   AUTHENTICATION
+#====================================================================================================================
 
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
@@ -55,7 +63,7 @@ if not st.session_state.authenticated:
     with cols[0]:
         authenticated = login.login()
 
-if authenticated:
+if authenticated and st.session_state.access_on:
     #-----------------------------Logout-----------------------------------
     # when btn Logout is clicked, all st.session keys are erased
     # since 'authorized' key is erased too, app returnes to unauthenticated state 

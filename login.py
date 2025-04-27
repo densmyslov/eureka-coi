@@ -186,14 +186,22 @@ def get_coi_data(counter=None):
             st.error("Your access is blocked. Please contact support.")
             st.stop()
         else:
-            
-            price_qty_data_df = pd.DataFrame(eval(data['price_qty_data']['S']))
-            
-            current_token_balance = data['current_token_balance']['N']
 
-            encoded_client_df = data['client_df']
+            access_on = data['access_on']
+            st.session_state['access_on'] = access_on
+            if st.session_state['access_on']:
+            
+                price_qty_data_df = pd.DataFrame(eval(data['price_qty_data']['S']))
+                
+                current_token_balance = data['current_token_balance']['N']
 
-            coi_email_hash = data['coi_email_hash']
+                encoded_client_df = data['client_df']
+
+                coi_email_hash = data['coi_email_hash']
+            else:
+                st.warning("Please contact Eureka Partners Support at contact@eurekapartners.com")
+                sleep(5)
+                logout()
 
 
             # Step 1: Base64 decode
@@ -212,6 +220,7 @@ def get_coi_data(counter=None):
             st.session_state["price_qty_data_df"] = price_qty_data_df
             st.session_state["client_df"] = client_df
             st.session_state["coi_email_hash"] = coi_email_hash
+            
 
 
 
