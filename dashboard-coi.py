@@ -15,17 +15,8 @@ import utils
 import stripe_payment as stp
 
 st.set_page_config(page_title="Eureka Partners Client Dashboard", layout="wide")
-# Your dashboard code here
-image = Image.open("assets/eureka_logo.jpeg")
-buffered = BytesIO()
-image.save(buffered, format="PNG")
-img_b64 = base64.b64encode(buffered.getvalue()).decode()
-st.markdown(f"""
-    <div style="display: flex; align-items: center;">
-        <img src="data:image/png;base64,{img_b64}" width="40" style="margin-right: 10px;">
-        <h1 style="margin: 0;">Eureka Partners Client Dashboard</h1>
-    </div>
-""", unsafe_allow_html=True)
+
+utils.show_title()
 
 #====================================BUTTON COLOR======================
 st.markdown("""
@@ -36,6 +27,13 @@ st.markdown("""
             }
             </style>
             """, unsafe_allow_html=True)
+
+query_params = st.query_params
+page = query_params.get('page', [''])
+
+if page == "success":
+    utils.show_success_page()
+    st.stop()
 
 #====================================================================================================================
 # INITIALIZE SESSION STATES
@@ -185,19 +183,35 @@ if authenticated and st.session_state.access_on:
         st.markdown("<h2 style='text-align: left'>Buy Tokens</h2>", unsafe_allow_html=True)
         st.dataframe(price_qty_data_df)
         st.markdown("<div style='display: flex; justify-content: center;'>", unsafe_allow_html=True)
+        
         tokens_to_buy = st.radio(
             "Buy tokens", price_qty_data_df['Qty'],
             horizontal=True,
             label_visibility="visible"
         )
+        
         if tokens_to_buy:
             st.session_state["tokens_to_buy"] = tokens_to_buy
             amount_to_pay = utils.calculate_amount_to_pay()
             st.metric(label="Amount to Pay", value=amount_to_pay)
 
-            stp.pay_with_stripe()
+            # stp.pay_with_stripe()
+            checkout_url = stp.create_checkout_session()
+            if checkout_url:
+                # Display the payment button
+                st.markdown("""
+                    <div style='text-align: center; margin-top: 20px;'>
+                        <a href="{0}" target="_blank">
+                            <button style="padding: 10px 20px; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                                Proceed to Payment
+                            </button>
+                        </a>
+                    </div>
+                """.format(checkout_url), unsafe_allow_html=True)
 
-    # Client df
+#=====================================================================================================
+                                        # SEE CLIENTS
+#=====================================================================================================
     st.header("👥 Your Clients")
 
     with st.expander("Expand to see Your Clients"):

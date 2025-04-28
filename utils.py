@@ -245,3 +245,32 @@ def upload_document_fragment():
             st.success("Document submitted successfully!")
         else:
             st.error("Failed to submit document.")
+
+def show_success_page():
+    # st.set_page_config(page_title="Payment Successful", page_icon="✅")
+
+    st.title("🎉 Payment Successful!")
+    st.success("Thank you for your purchase.")
+
+    # Optional: show the session_id if you want
+    query_params = st.query_params
+    session_id = query_params.get('session_id', [''])
+    
+    # if session_id:
+    #     st.info(f"Stripe session ID: `{session_id}`")
+        # (This session IDcan be verified with Stripe API if needed)
+
+    st.markdown("---")
+
+
+def show_title():
+    image = Image.open("assets/eureka_logo.jpeg")
+    buffered = BytesIO()
+    image.save(buffered, format="PNG")
+    img_b64 = base64.b64encode(buffered.getvalue()).decode()
+    st.markdown(f"""
+        <div style="display: flex; align-items: center;">
+            <img src="data:image/png;base64,{img_b64}" width="40" style="margin-right: 10px;">
+            <h1 style="margin: 0;">Eureka Partners Client Dashboard</h1>
+        </div>
+    """, unsafe_allow_html=True)

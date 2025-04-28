@@ -26,6 +26,13 @@ client_id = st.secrets["cognitoClient"]["client_id"]
 cogauth = cognito.CognitoIdentityProviderWrapper(cognito_idp_client, user_pool_id, client_id)
 
 def login():
+    # Allow access to success page without authentication
+    query_params = st.query_params
+    page = query_params.get('page', [''])[0]
+
+    if page == 'success':
+        return False 
+
     if "authenticated" not in st.session_state:
         st.session_state.authenticated = False
     if "need_new_password" not in st.session_state:
@@ -50,7 +57,6 @@ def login():
                         st.session_state['coi_email'] = email
                         st.session_state.access_token = response["access_token"]
                         st.session_state.authenticated = True
-                        st.success("You are logged in.")
                         decoded_access_token = jwt.get_unverified_claims(st.session_state["access_token"])
                         coi_uid = decoded_access_token["username"]
                         st.session_state["coi_uid"] = coi_uid
@@ -176,12 +182,12 @@ st.cache_data()
 def get_coi_data(counter=None):
     url = 'https://kbeopzaocc.execute-api.us-east-1.amazonaws.com/prod/get-user-data'
     response = utils.safe_api_post(url, {})
-    st.write(response)
+    # st.write(response)
     if response.status_code == 200:
         data = response.json()
         # st.write(data)
         access_on = data['access_on']['BOOL']
-        st.write(f"Access on: {access_on}")
+        # st.write(f"Access on: {access_on}")
         if not access_on:
             st.error("Your access is blocked. Please contact support.")
             st.stop()
