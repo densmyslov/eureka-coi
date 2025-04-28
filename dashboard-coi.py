@@ -7,7 +7,6 @@ import base64
 from io import BytesIO
 import requests
 from jose import jwt
-import base64
 from time import sleep
 import gzip
 import json

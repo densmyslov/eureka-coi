@@ -29,7 +29,7 @@ def create_checkout_session():
                 },
             ],
             mode='payment',
-            success_url=SUCCESS_URL,
+            success_url=SUCCESS_URL + '?page=success&session_id={CHECKOUT_SESSION_ID}',  # <- Updated
             cancel_url=CANCEL_URL,
             automatic_tax={'enabled': False},
             metadata={

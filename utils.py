@@ -250,17 +250,10 @@ def show_success_page():
     # st.set_page_config(page_title="Payment Successful", page_icon="✅")
 
     st.title("🎉 Payment Successful!")
-    st.success("Thank you for your purchase.")
+    st.success("Thank you for your purchase. You can now return to the browser tab where you logged in")
 
-    # Optional: show the session_id if you want
-    query_params = st.query_params
-    session_id = query_params.get('session_id', [''])
-    
-    # if session_id:
-    #     st.info(f"Stripe session ID: `{session_id}`")
-        # (This session IDcan be verified with Stripe API if needed)
 
-    st.markdown("---")
+
 
 
 def show_title():
