@@ -1,20 +1,33 @@
 
 import requests
+import boto3
 import streamlit as st
 import pandas as pd
 from io import BytesIO
 import base64
+from PIL import Image
+import os
+import json
+import utils
 import auth
+
+# DEFAULT_TOKEN_PRICES_DF_NAME = st.secrets["s3"]["DEFAULT_TOKEN_PRICES_DF_NAME"]
+# DEFAULT_BANKS_DF_NAME = st.secrets["s3"]["DEFAULT_BANKS_DF_NAME"]
+# BUCKET_NAME = st.secrets["s3"]["BUCKET_NAME"]
+# AWS_ACCESS_KEY_ID = st.secrets["cognitoClient"]["AWS_ACCESS_KEY_ID"]
+# AWS_SECRET_ACCESS_KEY = st.secrets["cognitoClient"]["AWS_SECRET_ACCESS_KEY"]
+
+# s3_client = boto3.client(
+#     "s3",
+#     aws_access_key_id=AWS_ACCESS_KEY_ID,
+#     aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+# )
 
 # ==============================
 #  HELPER FUNCTIONS
 # ==============================
 
-import base64
-from io import BytesIO
-from PIL import Image
-import streamlit as st
-import utils  # assuming safe_api_post lives here
+
 
 def calculate_amount_to_pay():
     tokens_to_buy = st.session_state.get("tokens_to_buy")
@@ -40,9 +53,25 @@ def display_images_in_tabs(image_dict):
         with tab:
             st.image(image_dict[key], caption=key, width = 400)
 
+def fetch_docs_df(client_email_hash):
+    url = 'https://kbeopzaocc.execute-api.us-east-1.amazonaws.com/prod/submit-docs'
+    payload = {
+        "message": "return docs_df",
+        "client_email_hash": client_email_hash,
+        "coi_email_hash": st.session_state["coi_email_hash"]
+    }
+    response = utils.safe_api_post(url, payload)
+    if response.status_code == 200:
+        data = response.json()
+        if data.get("message") == "docs_df does not exist":
+            st.session_state["docs_df"] = pd.DataFrame()
+        else:
+            st.session_state["docs_df"] = utils.load_df_from_base64_parquet(data["docs_df_parquet_base64"])
+
 st.cache_data()
 def get_images_to_show(docs_df, email_hash, avail_doc_types, counter=None):
     images = {}
+    
 
     if "doc_type" not in docs_df.columns or "key" not in docs_df.columns:
         return images  # nothing to show yet
@@ -67,6 +96,7 @@ def get_images_to_show(docs_df, email_hash, avail_doc_types, counter=None):
             images[doc_type] = Image.open(BytesIO(image_bytes))
 
     return images
+
 
 
 def _load_docs():
@@ -172,6 +202,22 @@ def safe_api_post(url, data):
         response = send_request()
 
     return response
+
+def submit_document(payload):
+    url = 'https://kbeopzaocc.execute-api.us-east-1.amazonaws.com/prod/submit-docs'
+    response = utils.safe_api_post(url, payload)
+    if response and response.status_code == 200:
+        try:
+            docs_df_parquet_base64 = response.json().get("docs_df_parquet_base64")
+            st.session_state["docs_df"] = utils.load_df_from_base64_parquet(docs_df_parquet_base64)
+            st.session_state["show_images"] = True
+            st.session_state.pop("last_uploaded_file", None)
+            st.success("Document submitted successfully!")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Failed to process response: {e}")
+    else:
+        st.error(f"API call failed with status code: {response.status_code if response else 'No response'}")
 
 def load_df_from_base64_parquet(base64_string: str) -> pd.DataFrame | None:
     """

@@ -5,11 +5,13 @@ import pandas as pd
 from PIL import Image
 import base64
 from io import BytesIO
+import io
 import requests
 from jose import jwt
 from time import sleep
 import gzip
 import json
+from PyPDF2 import PdfMerger
 import utils
 import stripe_payment as stp
 
@@ -27,6 +29,11 @@ st.markdown("""
             </style>
             """, unsafe_allow_html=True)
 
+#====================================================================================================================
+# STRIPE REDIRECT PAGE
+#====================================================================================================================
+
+
 query_params = st.query_params
 page = query_params.get('page', [''])
 
@@ -40,13 +47,14 @@ if page == "success":
 if 'access_on' not in st.session_state:
     st.session_state.access_on = 'False'
 
-#====================================================================================================================
-#   AUTHENTICATION
-#====================================================================================================================
-
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
+if "counter" not in st.session_state:
+        st.session_state.counter = 0
+#====================================================================================================================
+#   AUTHENTICATION
+#====================================================================================================================
 
     
 authenticated = st.session_state.authenticated
@@ -59,6 +67,13 @@ if not st.session_state.authenticated:
 
     with cols[0]:
         authenticated = login.login()
+
+
+
+#====================================================================================================================
+#   LOGOUT
+#====================================================================================================================
+
 
 if authenticated and st.session_state.access_on:
     #-----------------------------Logout-----------------------------------
@@ -75,9 +90,11 @@ if authenticated and st.session_state.access_on:
     # ✅ Only show dashboard if authenticated
     st.success("Welcome to the Dashboard!")
 
-    #=======================================REFRESH APP============================
-    if "counter" not in st.session_state:
-        st.session_state.counter = 0
+#=======================================================================================================================================
+# REFRESH APP
+# current_token_balance, price_qty_data_df, client_df, coi_email_hash
+#=======================================================================================================================================
+
 
     def increment_counter():
         st.session_state.counter += 1
@@ -85,11 +102,12 @@ if authenticated and st.session_state.access_on:
     if st.sidebar.button("Refresh"):
         increment_counter()
         # af.load_coi_table.clear()
-        current_token_balance, price_qty_data_df, client_df, coi_email_hash = login.get_coi_data(counter=st.session_state['counter'])
+        current_token_balance, price_qty_data_df, client_df, coi_email_hash, default_banks_df = login.get_coi_data(counter=st.session_state['counter'])
         st.session_state.current_token_balance = current_token_balance
         st.session_state.price_qty_data_df = price_qty_data_df
         st.session_state.client_df = client_df
         st.session_state.coi_email_hash = coi_email_hash
+        st.session_state.default_banks_df = default_banks_df
         st.rerun()
 
     # docs_df is df showing client documents in client's subfolder (client_email_hash)
@@ -105,8 +123,7 @@ if authenticated and st.session_state.access_on:
 
 
 
-    # Simulated values
-    monthly_performance = [2, 5, 3, 7, 6, 9]
+
 
 
 
@@ -236,36 +253,19 @@ if authenticated and st.session_state.access_on:
     with st.expander("Expand to Submit Client Documents"):
 
         st.info("Select a client in Your Clients section above. Upload each required document individually. Supported formats: PDF, JPG, PNG.")
+        st.header("📂 Upload Required Documents")
+        st.markdown(
+            f"<span style='color:green;'>You will upload documents of "
+            f"<span style='color:red;'>{first_name} {last_name}</span> "
+            f"with email <span style='color:blue;'>{email}</span></span>",
+            unsafe_allow_html=True
+        )
 
-
-        col_submit, col_view = st.columns(2)
+        col_submit, _, col_questionnaire = st.columns(3)
         with col_submit:
             if email_hash:
-                # Fetch docs_df for the selected client
-                url = 'https://kbeopzaocc.execute-api.us-east-1.amazonaws.com/prod/submit-docs'
-                payload = {
-                    "message": "return docs_df",
-                    "client_email_hash": email_hash,
-                    "coi_email_hash": st.session_state["coi_email_hash"]
-                }
-                response = utils.safe_api_post(url, payload)
-                if response.status_code == 200:
-                    response_data = response.json()
-                    if response_data.get("message") == "docs_df does not exist":
-                        docs_df = pd.DataFrame()
-                    else:
-                        docs_df_parquet_base64 = response_data.get("docs_df_parquet_base64")
-                        docs_df = utils.load_df_from_base64_parquet(docs_df_parquet_base64)
-                    st.session_state["docs_df"] = docs_df
+                utils.fetch_docs_df(email_hash)
 
-                # Document upload UI
-                st.header("📂 Upload Required Documents")
-                st.markdown(
-                    f"<span style='color:green;'>You will upload documents of "
-                    f"<span style='color:red;'>{first_name} {last_name}</span> "
-                    f"with email <span style='color:blue;'>{email}</span></span>",
-                    unsafe_allow_html=True
-                )
 
 
                 doc_types = ["EIN Letter", "Articles of Incorporation", "ID - front", "ID - back", "Questionnaire"]
@@ -280,39 +280,54 @@ if authenticated and st.session_state.access_on:
                         "file_data": base64.b64encode(file_obj.read()).decode("utf-8")
                     }
 
-                if st.button("Submit Document"):
-                    uploaded = st.session_state.get("last_uploaded_file")
-                    if uploaded is None:
-                        st.error("No document selected.")
+                    if st.button("Submit Document"):
+                        uploaded = st.session_state.get("last_uploaded_file")
+                        if uploaded is None:
+                            st.error("No document selected.")
+                            st.stop()
+
+                        payload = {
+                            "doc_type": uploaded["doc_type"],
+                            "file_name": uploaded["file_name"],
+                            "file_data": uploaded["file_data"],
+                            "client_email_hash": email_hash,
+                            "coi_email_hash": st.session_state["coi_email_hash"],
+                            "coi_uid": st.session_state["coi_uid"]
+                        }
+                        utils.submit_document(payload)
+
+        with col_questionnaire:
+
+            bank_name = st.selectbox("Select Bank", st.session_state.default_banks_df['name'])
+            st.write(f"You will submit a questionnaire for {bank_name}")
+            q_obj = st.file_uploader(f"Upload bank questionnaire for {bank_name}", type=["pdf"],key="questionnaire_upload")
+            if q_obj is not None:
+                st.session_state["last_uploaded_questionnaire"] = {
+                    "file_name": f"{bank_name} Questionnaire.pdf",
+                    "file_data": base64.b64encode(q_obj.read()).decode("utf-8"),
+                    "doc_type":"Questionnaire",
+                    "bank_name": bank_name
+                }
+                if st.button("Submit Document", key='submit_questionnaire'):
+                    uploaded_q = st.session_state.get("last_uploaded_questionnaire")
+                    if uploaded_q is None:
+                        st.error("No questionnaire selected.")
                         st.stop()
 
                     payload = {
-                        "doc_type": uploaded["doc_type"],
-                        "file_name": uploaded["file_name"],
-                        "file_data": uploaded["file_data"],
+                        "doc_type": uploaded_q["doc_type"],
+                        "file_name": uploaded_q["file_name"],
+                        "file_data": uploaded_q["file_data"],
+                        "bank_name": uploaded_q["bank_name"],
                         "client_email_hash": email_hash,
                         "coi_email_hash": st.session_state["coi_email_hash"],
                         "coi_uid": st.session_state["coi_uid"]
                     }
 
-                    url = 'https://kbeopzaocc.execute-api.us-east-1.amazonaws.com/prod/submit-docs'
-                    response = utils.safe_api_post(url, payload)
+                    utils.submit_document(payload)
 
-                    if response is not None and response.status_code == 200:
-                        st.success("Document submitted successfully!")
-                        try:
-                            response_data = response.json()
-                            docs_df_parquet_base64 = response_data.get("docs_df_parquet_base64")
-                            st.session_state["docs_df"] = utils.load_df_from_base64_parquet(docs_df_parquet_base64)
-                            st.session_state["show_images"] = True
-                            st.session_state.pop("last_uploaded_file", None)  # Clear the file after successful upload
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Failed to process response: {e}")
-                    else:
-                        st.error(f"API call failed with status code: {response.status_code if response else 'No response'}")
 
-                        
+           
 #----------------------------------------VIEW SUBMITTED DOCUMENTS--------------------------------------------
     with st.expander("Expand to View Submitted Documents"):
     
@@ -320,14 +335,6 @@ if authenticated and st.session_state.access_on:
                 st.warning("You did not submit any documents yet.")
             else:
 
-
-             
-                doc_types_uploaded = st.session_state["docs_df"].dropna(subset=["doc_type"])["doc_type"].unique()
-                doc_types_list = [True if i in doc_types_uploaded else False for i in doc_types]
-                docs_uploaded_df = pd.DataFrame({"doc_type": doc_types, "available": doc_types_list})
-                st.dataframe(docs_uploaded_df)
-
-                avail_doc_types = docs_uploaded_df.query("available==True").doc_type.tolist()
 
                 if (
                         "docs_df" in st.session_state
@@ -337,11 +344,10 @@ if authenticated and st.session_state.access_on:
                     docs_df = st.session_state["docs_df"]
 
                     # Show the uploaded document status
-                    doc_types_uploaded = docs_df["doc_type"].dropna().unique()
-                    doc_types_list = [doc_type in doc_types_uploaded for doc_type in doc_types]
+                    doc_types_uploaded = docs_df["doc_type"].str.lower().dropna().unique()
+                    doc_types_list = [doc_type.lower() in doc_types_uploaded for doc_type in doc_types]
                     docs_uploaded_df = pd.DataFrame({"doc_type": doc_types, "available": doc_types_list})
 
-                    # st.dataframe(docs_uploaded_df)
 
                     avail_doc_types = docs_uploaded_df.query("available == True")["doc_type"].tolist()
 
@@ -350,35 +356,59 @@ if authenticated and st.session_state.access_on:
                     utils.display_images_in_tabs(images)
 
             
-                
                     
 
     # Final Package Download
+    #----------------------------------------DOWNLOAD FINAL COMBINED PDF--------------------------------------------
     st.header("📥 Final Package")
     if st.button("Download Final Combined PDF"):
-        st.download_button("📄 Download PDF", b"Dummy PDF content", file_name="final_package.pdf")
+        original_docs = []
+        original_files_dict = st.session_state['docs_df'].query("doc_class=='original'").set_index('doc_type')['key'].to_dict()
+        api_url = 'https://kbeopzaocc.execute-api.us-east-1.amazonaws.com/prod/get-original-file'
 
-    # Request Token Back
-    st.header("⬅️ Token Return")
-    denial_letter = st.file_uploader("Upload Denial Letter", type=["pdf"])
-    if st.button("Request Token Back"):
-        st.info("Token return requested!")
 
-    # Progress Tracker
-    st.header("📶 Client Progress")
-    steps = ["Step 1", "Step 2", "Step 3", "Step 4", "Step 5"]
-    progress = [0.2, 0.4, 0.6, 0.3, 0.8]
-    for s, p in zip(steps, progress):
-        st.write(s)
-        st.progress(p)
+        for doc_type, key in original_files_dict.items():
+            payload = {"key": key}
+            response = utils.safe_api_post(api_url, payload)
+            print(response.status_code)
+            if response.status_code == 200:
+                content_type = response.headers.get('Content-Type', '')
+                file_bytes = io.BytesIO(response.content)
 
-    # Referral Tracker
-    st.header("👥 Referral Tracker")
-    st.metric("Clients Referred", 6)
-    st.metric("Fees Earned", "$1,250")
-    st.bar_chart(pd.DataFrame({
-        "Month": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
-        "Referrals": monthly_performance
-    }).set_index("Month"))
+                # Convert images to PDF if needed
+                if content_type.startswith('image/'):
+                    img = Image.open(file_bytes).convert("RGB")
+                    img_pdf = io.BytesIO()
+                    img.save(img_pdf, format="PDF")
+                    img_pdf.seek(0)
+                    original_docs.append(img_pdf)
+                elif content_type == 'application/pdf':
+                    original_docs.append(file_bytes)
+            else:
+                st.warning(f"Failed to fetch {doc_type} from API.")
+
+
+        # Merge all PDFs
+        if original_docs:
+            merger = PdfMerger()
+            for pdf in original_docs:
+                merger.append(pdf)
+
+            final_pdf = io.BytesIO()
+            merger.write(final_pdf)
+            merger.close()
+            final_pdf.seek(0)
+
+            st.download_button(
+                label="📄 Download Combined PDF",
+                data=final_pdf,
+                file_name="combined_documents.pdf",
+                mime="application/pdf"
+            )
+        else:
+            st.error("No documents available to combine.")
+
+
+
 
 

@@ -204,10 +204,13 @@ def get_coi_data(counter=None):
                 encoded_client_df = data['client_df']
 
                 coi_email_hash = data['coi_email_hash']
+
+                encoded_default_banks_df = data['default_banks_df']
+
             else:
                 st.warning("Please contact Eureka Partners Support at contact@eurekapartners.com")
                 sleep(5)
-                logout()
+                st.stop()
 
 
             # Step 1: Base64 decode
@@ -222,15 +225,22 @@ def get_coi_data(counter=None):
             else:
                 client_df = pd.DataFrame()
 
+            if encoded_default_banks_df:
+                parquet_bytes = base64.b64decode(encoded_default_banks_df)
+                buffer = BytesIO(parquet_bytes)
+                default_banks_df = pd.read_parquet(buffer)
+            else:
+                default_banks_df = pd.DataFrame()
+
             st.session_state["current_token_balance"] = current_token_balance
             st.session_state["price_qty_data_df"] = price_qty_data_df
             st.session_state["client_df"] = client_df
             st.session_state["coi_email_hash"] = coi_email_hash
-            
+            st.session_state["default_banks_df"] = default_banks_df
 
 
 
-        return current_token_balance, price_qty_data_df, client_df, coi_email_hash
+        return current_token_balance, price_qty_data_df, client_df, coi_email_hash, default_banks_df
     else:
         st.warning("Please contact Eureka Partnersa Support at contact@eurekapartners.com")
         logout()
